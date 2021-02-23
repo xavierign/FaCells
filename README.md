@@ -1,4 +1,4 @@
-#The FaCells (under construction)
+# The FaCells (under construction).
 The FaCells. An Exploratory Study about LSTM Layers on Face Sketches Classifiers.
 Code implementing the paper www.arxiv.link
  
