@@ -17,3 +17,5 @@ Code implementing the paper www.arxiv.link
     
     #plotOneFeature (featureId, numberOfDrawsToOverlap, threshold, facellsProject)
     plotOneFeature(6,1000, 8, facellsProject)
+
+the script will create the photo '6-1000-8.pdf' in the output dir
