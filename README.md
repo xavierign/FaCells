@@ -5,6 +5,7 @@ Code implementing the paper www.arxiv.link
 1. uncompress the zip file in the root directory, total 15.1 Gb. It will create a folder named 'data' with the input draws, the model, and predictions pre-calculated.
 2. see the initial_script.ipynb with the following lines.
  
+##
     from functions.paperFunctions import *
     from functions.modelExploring import *
     from functions.FaCells import FaCellsProject
