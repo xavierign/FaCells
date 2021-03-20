@@ -1,6 +1,9 @@
 # The FaCells (under construction).
 The FaCells. An Exploratory Study about LSTM Layers on Face Sketches Classifiers.
 Code implementing the paper www.arxiv.link
+
+1. uncompress the zip file in the root directory. It will create a folder named 'data' with the input draws, the model, and predictions pre-calculated.
+2. 
  
     from functions.paperFunctions import *
     from functions.modelExploring import *
