@@ -49,7 +49,7 @@ def plotOneRecord3D_weigths(draw, series, thres, lowerOrEqual = False, show=True
     if show:            
         plt.show()
 
-def plotOneFeature(featureId, nDraws, threshold, facellsProject, invertedFeature = False):
+def plotOneFeature(featureId, nDraws, threshold, facellsProject, outputDir = 'output', invertedFeature = False):
     
     print(facellsProject.columnNames[featureId])
     #try:
@@ -75,7 +75,7 @@ def plotOneFeature(featureId, nDraws, threshold, facellsProject, invertedFeature
         #plotOneRecord3D_weigths(draw[0], [10 for i in range(len(draw[0]))], threshold, lowerOrEqual = False, show=False)
 
     #plt.show()
-    plt.savefig('photo_dump/' + str(featureId) + '-' + str(nDraws) + '-' + str(threshold) + '.pdf',
+    plt.savefig(outputDir + '/' + str(featureId) + '-' + str(nDraws) + '-' + str(threshold) + '.pdf',
                bbox_inches='tight')  
     #except:
     #    print('error')

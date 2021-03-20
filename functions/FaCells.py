@@ -10,7 +10,7 @@ import random, time
 import pandas as pd
 
 class FaCellsProject:
-    def __init__(self, formatName):
+    def __init__(self, formatName, dataFolder):
         self.Xdct = {}
         self.ydct = {}
         self.dfdct = {}
@@ -19,19 +19,16 @@ class FaCellsProject:
         self.lengthList =[]
         self.drawWeightsDct = {}
         self.lengthListCounted = []
-        self.dfFull = []
+        #self.dfFull = []
         self.yPredDct = {}
         self.yPredDfFull = pd.DataFrame()
         
         # Using readlines() 
-        fileTemp = open('data/colNames.txt', 'r')
+        fileTemp = open(dataFolder + '/colNames.txt', 'r')
         self.columnNames = fileTemp.read().split("\n")
 
-        # formatName (S0s,S3s,all)
-        if formatName!="multi":
-            mypath = "/Users/xaviering/Desktop/AI experiments/deepFaceDraw/data/" + formatName + "/split/"
-        else:
-            mypath = "/Users/xaviering/Desktop/AI experiments/deepFaceDraw/data/S0s/multi/"
+        mypath = dataFolder + "/drawsByFormat/" + formatName + "/"
+
         onlyfiles = [f for f in listdir(mypath) if isfile(join(mypath, f))]
         for f in onlyfiles:
             if "X" in f and 'icloud' not in f:
@@ -43,12 +40,12 @@ class FaCellsProject:
                 self.lengthListCounted.append(len(self.Xdct[length]))
 
         #TODO load dfDict and merge them into one
-        with open('data/dfFull.pickle', 'rb') as handle:
-            self.dfFull = pickle.load(handle)
+        #with open('data/dfFull.pickle', 'rb') as handle:
+        #    self.dfFull = pickle.load(handle)
             
-    def loadModel(self, modelName):
-        modelDir = "/Users/xaviering/Desktop/AI experiments/deepFaceDraw/models/"
-        self.model = load_model(modelDir + modelName,compile=False) 
+    def loadModel(self, modelName, modelDir):
+        #modelDir = self.dataFolder
+        self.model = load_model(modelDir +"/" + modelName,compile=False) 
         
     def loadPredictions(self):
         with open('data/drawWeightsDct.pickle', 'rb') as handle:
