@@ -3,7 +3,8 @@ The FaCells. An Exploratory Study about LSTM Layers on Face Sketches Classifiers
 Code implementing the paper www.arxiv.link
 
 1. uncompress the zip file in the root directory, total 15.1 Gb. It will create a folder named 'data' with the input draws, the model, and predictions pre-calculated.
-2. see the initial_script.ipynb with the following lines.
+2. install requirements.txt
+3. see the initial_script.ipynb with the following lines.
  
 ##
     from functions.paperFunctions import *
