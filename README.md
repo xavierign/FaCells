@@ -6,10 +6,10 @@ Code implementing the paper www.arxiv.link
     from functions.modelExploring import *
     from functions.FaCells import FaCellsProject
 
-    facellsProject = FaCellsProject('multi')
-    facellsProject.loadModel("modelX.h5")
+    facellsProject = FaCellsProject('absolute-sorted','data')
+    facellsProject.loadModel("modelX.h5", 'data')
     facellsProject.loadPredictions()
-    facellsProject.model.summary()
-
+    #facellsProject.model.summary()
+    
+    #plotOneFeature (featureId, numberOfDrawsToOverlap, threshold, facellsProject)
     plotOneFeature(6,1000, 8, facellsProject)
-  
