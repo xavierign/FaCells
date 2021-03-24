@@ -1,8 +1,10 @@
 # The FaCells.
 The FaCells. An Exploratory Study about LSTM Layers on Face Sketches Classifiers.
 Code implementing the paper [https://arxiv.org/abs/2102.11361](https://arxiv.org/abs/2102.11361).
-try the demo in p5.js in [http://www.columbia.edu/~xig2000/FaCells/](http://www.columbia.edu/~xig2000/FaCells/) 
 
+Try the demo in [http://www.columbia.edu/~xig2000/FaCells/](http://www.columbia.edu/~xig2000/FaCells/) 
+
+To install the code:
 
 1. uncompress this [zip](https://drive.google.com/file/d/1lH0iecda0t8TbYgosPnoHYhcGVFl8Afk/view?usp=sharing) file in the root directory, total 15.1 Gb. It will create a folder named 'data' with the input draws, the model, and predictions pre-calculated.
 2. install requirements.txt
