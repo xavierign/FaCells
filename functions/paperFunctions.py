@@ -74,9 +74,9 @@ def plotOneFeature(featureId, nDraws, threshold, facellsProject, outputDir = 'ou
         plotOneRecord3D_weigths(draw[0], draw_weights, threshold, lowerOrEqual = invertedFeature, show=False)
         #plotOneRecord3D_weigths(draw[0], [10 for i in range(len(draw[0]))], threshold, lowerOrEqual = False, show=False)
 
-    #plt.show()
-    plt.savefig(outputDir + '/' + str(featureId) + '-' + str(nDraws) + '-' + str(threshold) + '.pdf',
-               bbox_inches='tight')  
+
+    plt.savefig(outputDir + '/' + str(featureId) + '-' + str(nDraws) + '-' + str(threshold) + '.pdf' )#,
+               #bbox_inches='tight')  
     #except:
     #    print('error')
 

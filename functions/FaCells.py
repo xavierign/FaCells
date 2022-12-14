@@ -22,6 +22,7 @@ class FaCellsProject:
         #self.dfFull = []
         self.yPredDct = {}
         self.yPredDfFull = pd.DataFrame()
+        self.dataFolder = dataFolder
         
         # Using readlines() 
         fileTemp = open(dataFolder + '/colNames.txt', 'r')
@@ -31,30 +32,28 @@ class FaCellsProject:
 
         onlyfiles = [f for f in listdir(mypath) if isfile(join(mypath, f))]
         for f in onlyfiles:
-            if "X" in f and 'icloud' not in f:
+            if "X" in f and 'icloud' not in f and '._' not in f:
                 length = int(f.split(".")[0].split("_")[1])
                 self.Xdct[length] = np.load(mypath + 'X_' + str(length) + '.npy')
                 self.ydct[length] = np.load(mypath + 'y_' + str(length) + '.npy')
                 self.dfdct[length]  = np.load(mypath + 'df_' + str(length) + '.npy')
-                self.lengthList.append( length)
+                self.lengthList.append(length)
                 self.lengthListCounted.append(len(self.Xdct[length]))
-
-        #TODO load dfDict and merge them into one
-        #with open('data/dfFull.pickle', 'rb') as handle:
-        #    self.dfFull = pickle.load(handle)
-            
+		        #TODO load dfDict and merge them into one
+		        #with open('data/dfFull.pickle', 'rb') as handle:
+		        #    self.dfFull = pickle.load(handle)        
     def loadModel(self, modelName, modelDir):
         #modelDir = self.dataFolder
         self.model = load_model(modelDir +"/" + modelName,compile=False) 
         
     def loadPredictions(self):
-        with open('data/drawWeightsDct.pickle', 'rb') as handle:
-            self.drawWeightsDct = pickle.load(handle)    
+        #with open(self.dataFolder + '/drawWeightsDct.pickle', 'rb') as handle:
+        #    self.drawWeightsDct = pickle.load(handle)    
         
-        with open('data/yPredDct.pickle', 'rb') as handle:
+        with open(self.dataFolder + '/yPredDct.pickle', 'rb') as handle:
             self.yPredDct = pickle.load(handle)  
         
-        with open('data/yPredDfFull.pickle', 'rb') as handle:
+        with open(self.dataFolder + '/yPredDfFull.pickle', 'rb') as handle:
             self.yPredDfFull = pickle.load(handle)  
             self.yPredDfFull = self.yPredDfFull.reset_index()
 
