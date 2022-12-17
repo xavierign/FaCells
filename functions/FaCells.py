@@ -47,8 +47,8 @@ class FaCellsProject:
         self.model = load_model(modelDir +"/" + modelName,compile=False) 
         
     def loadPredictions(self):
-        #with open(self.dataFolder + '/drawWeightsDct.pickle', 'rb') as handle:
-        #    self.drawWeightsDct = pickle.load(handle)    
+        with open(self.dataFolder + '/drawWeightsDct.pickle', 'rb') as handle:
+            self.drawWeightsDct = pickle.load(handle)    
         
         with open(self.dataFolder + '/yPredDct.pickle', 'rb') as handle:
             self.yPredDct = pickle.load(handle)  
