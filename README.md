@@ -6,9 +6,9 @@ Try the demo in [http://www.columbia.edu/~xig2000/FaCells/](http://www.columbia.
 
 To install the repo:
 
-1. uncompress the data folder [data](https://drive.google.com/drive/folders/1dqiZDDf7n-pcDXZkYwL7zvTDX6TKqiDE?usp=share_link) file in the root directory, total 15.1 Gb. It will create a folder named 'data' with the input draws, the model, and previously calculated predictions.
-2. install requirements.txt
-3. see the initial_script.ipynb with the following lines.
+1. uncompress the data folder [data](https://drive.google.com/drive/folders/16i_S7AevzbrrfzCqm07d4vXzVWxISp4j?usp=share_link) file in the root directory, total 15.1 Gb. It will create a folder named 'data' with the input draws, the model, and previously calculated predictions.
+3. install requirements.txt
+4. see the initial_script.ipynb with the following lines.
  
 ##
     from functions.paperFunctions import *
