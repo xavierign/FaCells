@@ -30,4 +30,4 @@ def convert_to_draw(inFile,
 
 	return lines
 
-convert_to_draw('Angelina-Jolie-100x130cm-2013.webp')
+convert_to_draw('rosario.jpg')
