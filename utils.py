@@ -56,8 +56,34 @@ class Drawing():
     def union(self, drawing: Drawing):
         self.lines += drawing.lines
 
+    def get_x_values(self):
+        x_values = []
+        for line in self.lines:
+            
+            x_values += line.x
+
+
     def pretty_printer(self):
+        longest_line = 0
+        shortest_line = len(self.lines[0].points)
+        len_lines = {}
         print("printing drawing...")
         for i, line in enumerate(self.lines):
+            length_line = len(line.points)
+            if length_line in len_lines:
+                len_lines[length_line] += 1
+            else:
+                len_lines[length_line] = 1
+            if length_line < shortest_line:
+                shortest_line = length_line
+            if length_line > longest_line:
+                longest_line = length_line
             print("Line {}: {}".format(i+1, line.format()))
+
+        print("\nLongest line: {}\nShortest line: {}".format(longest_line, shortest_line))
+        
+        sorted_items = sorted(len_lines.items())
+        for length, count in sorted_items:
+            print(f"Number of lines with length {length}: {count}")
+        
             
