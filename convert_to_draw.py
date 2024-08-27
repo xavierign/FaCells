@@ -61,20 +61,6 @@ def fill_drawings_max(drawings):
     ragged_drawings = tf.ragged.constant(rectangular_drawings)
     return ragged_drawings
 
-
-def len_lines(drawing):
-    count = []
-    for line in drawing:
-        count += [len(line)]
-    print(count)
-    mean = statistics.mean(count)
-    median = statistics.median(count)
-    mode = statistics.mode(count)
-    print(f"The mean is {mean}")
-    print(f"The median is {median}")
-    print(f"The mode is {mode}")
-
-
 def convert_to_draw(inFile,
                     input_dir = 'test_photos',
                     output_path = 'test_draws',
@@ -181,6 +167,6 @@ if __name__ == "__main__":
     encoded_drawing = convert_sketch_to_encoded_drawing(draw)
     encoded_drawing.pretty_printer()
     
-    draw = convert_to_draw("23.jpg", input_dir="../intel-image-building-forest/seg_train/forest", output_path="test_draws/intel-image-building-forest")
-    encoded_drawing = convert_sketch_to_encoded_drawing(draw)
-    encoded_drawing.pretty_printer()
+    # draw = convert_to_draw("23.jpg", input_dir="../intel-image-building-forest/seg_train/forest", output_path="test_draws/intel-image-building-forest")
+    # encoded_drawing = convert_sketch_to_encoded_drawing(draw)
+    # encoded_drawing.pretty_printer()

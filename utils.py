@@ -1,6 +1,7 @@
 from __future__ import annotations
 from operator import truediv
 from typing import List
+import statistics
 
 class Point():
     def __init__(self, x: float, y: float):
@@ -52,6 +53,11 @@ class Line():
 class Drawing():
     def __init__(self, lines: List[Line]):
         self.lines = lines
+        self.len_longest_line = None
+        self.len_shortest_line = None
+        self.mean_len_lines = None
+        self.median_len_lines = None
+        self.mode_len_lines = None
 
     def union(self, drawing: Drawing):
         self.lines += drawing.lines
@@ -64,26 +70,36 @@ class Drawing():
 
 
     def pretty_printer(self):
-        longest_line = 0
-        shortest_line = len(self.lines[0].points)
-        len_lines = {}
-        print("printing drawing...")
+        print("Printing drawing...")
+        for i, line in enumerate(self.lines):
+            print(f"Line {i+1}: {line.format()}")
+
+        print(f"Number of lines in drawing: {len(self.lines)}")
+
+        self.get_stats()
+        print("\nLines stats:")
+        print(f"Longest line: {self.len_longest_line}")
+        print(f"Shortest line: {self.len_shortest_line}")
+        print(f"Mean length lines: {self.mean_len_lines:.2f}")
+        print(f"Median length lines: {self.median_len_lines}")
+        print(f"Mode length lines: {self.mode_len_lines}")
+        
+    def get_stats(self):
+        """Populates length of longest and shortest line, mean, mode and median"""
+        self.len_longest_line = 0
+        self.len_shortest_line = len(self.lines[0].points)
+        len_lines = []
         for i, line in enumerate(self.lines):
             length_line = len(line.points)
-            if length_line in len_lines:
-                len_lines[length_line] += 1
-            else:
-                len_lines[length_line] = 1
-            if length_line < shortest_line:
-                shortest_line = length_line
-            if length_line > longest_line:
-                longest_line = length_line
-            print("Line {}: {}".format(i+1, line.format()))
+            len_lines += [length_line]
+            if length_line < self.len_shortest_line:
+                self.len_shortest_line = length_line
+            if length_line > self.len_longest_line:
+                self.len_longest_line = length_line
 
-        print("\nLongest line: {}\nShortest line: {}".format(longest_line, shortest_line))
+        self.mean_len_lines = statistics.mean(len_lines)
+        self.median_len_lines = statistics.median(len_lines)
+        self.mode_len_lines = statistics.mode(len_lines)
         
-        sorted_items = sorted(len_lines.items())
-        for length, count in sorted_items:
-            print(f"Number of lines with length {length}: {count}")
         
             
