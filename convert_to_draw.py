@@ -97,6 +97,7 @@ def bulk_convert_to_draw(input_directory, output_directory):
     if not os.path.exists(output_directory):
         os.makedirs(output_directory)
 
+    i = 0
     # iterate over the first level of the input directory
     for entry in os.listdir(input_directory):
         entry_path = os.path.join(input_directory, entry)
@@ -115,14 +116,18 @@ def bulk_convert_to_draw(input_directory, output_directory):
                     if file.lower().endswith('.jpg'):
                         input_file_path = os.path.join(entry_path, file)
                         output_file_path = os.path.join(dest_directory, file)
-                        print(f"   Converting image {file} in {entry_path} to drawing in {dest_directory}...")
+                        if i % 100 == 0:
+                            print(f"   Processed {i}... converting image {file} in {entry_path} to drawing in {dest_directory}...")
+                        i += 1
                         convert_to_draw(file, entry_path, dest_directory)
         else: # if it's not a directory and it's a jpg file, convert to draw
             if entry.lower().endswith('.jpg'):
                 dest_directory = output_directory
                 input_file_path = entry_path
                 output_file_path = os.path.join(dest_directory, entry)
-                print(f"   Converting image {input_directory} to drawing in {output_directory}...")
+                if i % 100 == 0:
+                    print(f"   Processed {i}... converting image {entry} to drawing in {output_directory}...")
+                i += 1
                 convert_to_draw(entry, input_dir=input_directory, output_path=output_directory)
 
 def get_sobel_results(image_path, output_path, blur_sigma=1.0):
@@ -167,6 +172,4 @@ if __name__ == "__main__":
     encoded_drawing = convert_sketch_to_encoded_drawing(draw)
     encoded_drawing.pretty_printer()
     
-    # draw = convert_to_draw("23.jpg", input_dir="../intel-image-building-forest/seg_train/forest", output_path="test_draws/intel-image-building-forest")
-    # encoded_drawing = convert_sketch_to_encoded_drawing(draw)
-    # encoded_drawing.pretty_printer()
+    bulk_convert_to_draw('../CelebA/Img/img_align_celeba', '../CelebADrawings/')
