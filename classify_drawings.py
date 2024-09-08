@@ -10,6 +10,8 @@ import io
 from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
 from itertools import islice
 from sklearn.linear_model import SGDClassifier
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import LSTM, Dense
 
 class CelebADrawingsClassifier(ABC):
     """Abstract class to classify drawings from the images of the CelebA dataset."""
@@ -92,14 +94,6 @@ class CelebADrawingsClassifier(ABC):
             batch_y = np.array(batch_y)
             yield batch_X, batch_y
 
-    def _test_set_generator(self):
-        test_batches_X = []
-        test_batches_y = []
-        for batch_X, batch_y in self._batch_data_generator(self.test_data):
-            test_batches_X.append(batch_X)
-            test_batches_y.append(batch_y)
-        self.X_test = np.concatenate(test_batches_X)
-        self.y_test = np.concatenate(test_batches_y)
 
     @abstractmethod
     def train(self):
@@ -143,14 +137,58 @@ class CelebAIncrementalClassifier(CelebADrawingsClassifier):
         total_pred_y = []
         i = 0
         for batch_X, batch_y in self._batch_data_generator(self.test_data):
+            pred_y = self.model.predict(batch_X)
             if i % 100 == 0:
                 print(f"already predicted batch {i}")
             i += 1
-            pred_y = self.model.predict(batch_X)
             total_true_y.extend(batch_y)
             total_pred_y.extend(pred_y)
         
         self.show_results(total_pred_y, total_true_y)
+
+
+class CelebALSTMClassifier(CelebADrawingsClassifier):
+    def __init__(self, drawings_directory: str, attributes_file: str, attribute_for_classification: str, chunk_size: int = 100):
+        super().__init__(drawings_directory, attributes_file, attribute_for_classification, chunk_size)
+        self.model = self._build_model()
+
+    def _build_model(self):
+        model = Sequential([
+            LSTM(64, input_shape=(218, 178 * 4), return_sequences=False),
+            Dense(1, activation='sigmoid')
+        ])
+        model.compile(optimizer='Adam', loss='binary_crossentropy', metrics=['accuracy'])
+        return model
+
+    def train(self, epochs=1):
+        for epoch in range(epochs):
+            i = 1
+            for batch_X, batch_y in self._batch_data_generator(self.train_data):
+                batch_y = np.array([0 if label == -1 else 1 for label in batch_y])
+                batch_X = batch_X.reshape(batch_X.shape[0], 218, 178 * 4)
+                self.model.fit(batch_X, batch_y, epochs=1, verbose=1, batch_size=self._chunk_size)
+                if i % 100 == 0:
+                    print(f"processed batch number {i}...")
+                i += 1
+
+    def evaluate(self):
+        print("evaluating")
+        total_true_y = []
+        total_pred_y = []
+        i = 0
+        for batch_X, batch_y in self._batch_data_generator(self.test_data):
+            batch_y = np.array([0 if label == -1 else 1 for label in batch_y])
+            batch_X = batch_X.reshape(batch_X.shape[0], 218, 178 * 4)
+            pred_y = self.model.predict(batch_X)
+            pred_y = np.round(pred_y).astype(int)
+            if i % 100 == 0:
+                print(f"already predicted batch {i}")
+            i += 1
+            total_true_y.extend(batch_y)
+            total_pred_y.extend(pred_y)
+        
+        self.show_results(total_pred_y, total_true_y)
+
 
 
 def check_classes_balance(attributes_file):
@@ -193,7 +231,12 @@ if __name__ == "__main__":
     # for balance_info in classes_balances:
         # print(f"Attribute {balance_info['attribute']}: {balance_info['balance_percentage']:.2f} (class 1: {balance_info['class_1_count']}, class -1: {balance_info['class_minus_1_count']})")
     
-    classifier = CelebAIncrementalClassifier('../CelebADrawings/', '../CelebA/Anno/list_attr_celeba.txt', 'Smiling') 
+    # classifier = CelebAIncrementalClassifier('../CelebADrawings/', '../CelebA/Anno/list_attr_celeba.txt', 'Smiling') 
     
+    # classifier.train()
+    # classifier.evaluate()
+
+    classifier = CelebALSTMClassifier('../CelebADrawings/', '../CelebA/Anno/list_attr_celeba.txt', 'Smiling')
+    # classifier = CelebALSTMClassifier('../test/', '../test/list_attr_celeba.txt', 'Smiling')
     classifier.train()
     classifier.evaluate()
