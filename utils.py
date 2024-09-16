@@ -12,14 +12,14 @@ class PointEncoded(Point):
     """sistema de coordenadas absoluto"""
     def __init__(self, x: float, y: float):
         super().__init__(x, y)
-        self.is_start_of_line = 0
-        self.is_end_of_line = 0
+        self.start_of_line = 0
+        self.end_of_line = 0
     
     def set_start_of_line(self):
-        self.is_start_of_line = 1
+        self.start_of_line = 1
 
     def set_end_of_line(self):
-        self.is_end_of_line = 1
+        self.end_of_line = 1
     
     def format(self):
         return "({}, {}), ".format(self.x, self.y)
@@ -36,12 +36,12 @@ class Line():
    
     def _get_start_point(self, points: List[PointEncoded]):
         for point in points:
-            if point.is_start_of_line:
+            if point.start_of_line:
                 return point
 
     def _get_end_point(self, points: List[PointEncoded]):
         for point in points:
-            if point.is_end_of_line:
+            if point.end_of_line:
                 return point
 
     def format(self):
@@ -53,6 +53,7 @@ class Line():
 class Drawing():
     def __init__(self, lines: List[Line]):
         self.lines = lines
+        self.number_lines = len(lines)
         self.len_longest_line = None
         self.len_shortest_line = None
         self.mean_len_lines = None
