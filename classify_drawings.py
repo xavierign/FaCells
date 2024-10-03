@@ -12,17 +12,19 @@ from itertools import islice
 from sklearn.linear_model import SGDClassifier
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import LSTM, Dense
+from collections import defaultdict
 
 class CelebADrawingsClassifier(ABC):
     """Abstract class to classify drawings from the images of the CelebA dataset."""
-    def __init__(self, drawings_directory, attributes_file, attribute_for_classification, chunk_size, train_percentage=0.75):
-        self._drawings_dir = drawings_directory
+    def __init__(self, drawings, attributes_file, attribute_for_classification, chunk_size=100, train_percentage=0.75):
+        self._drawings = drawings
         self._attributes_file = attributes_file
         self._chunk_size = chunk_size
         self._train_percentage = train_percentage # maybe not necessary to store it 
         self._attribute_names = []
         self._attribute_for_classification_idx = self._set_attribute_for_classification(attribute_for_classification)
-        self._drawing_attribute_value = []
+        self._drawing_attribute_value_data = [] # list of tuples (n, v) where n is name of drawing, v is attribute value for it
+        self._drawing_attribute_value_dict = {} # keys are the indexes of the drawings and values are the attribute value
         self._populate_drawing_attribute_value()
         self.train_data = []
         self.test_data = []
@@ -35,12 +37,13 @@ class CelebADrawingsClassifier(ABC):
             # skipping the first two rows because: 
             # the first row of the file is the number of images in the dataset and
             # the second row of the file has the names of the attributes
-            for line in lines[2:]:
+            for i, line in enumerate(lines[2:]):
                 parts = line.strip().split()
                 # the first element is the name of the image with extension
                 name = os.path.splitext(parts[0])[0] 
                 attribute_value = parts[self._attribute_for_classification_idx] # string that is either 1 or -1
-                self._drawing_attribute_value += [(name, attribute_value)]
+                self._drawing_attribute_value_data += [(name, attribute_value)]
+                self._drawing_attribute_value_dict[i] = attribute_value
 
     def _set_attribute_for_classification(self, name):
         # first populate attribute_names with the values in the attributes_file
@@ -65,35 +68,10 @@ class CelebADrawingsClassifier(ABC):
 
     def _split_train_test(self):
         self.train_data, self.test_data = train_test_split(
-            self._drawing_attribute_value, 
+            self._drawing_attribute_value_data, 
             train_size=self._train_percentage, 
-            stratify=[value for _, value in self._drawing_attribute_value]
+            stratify=[value for _, value in self._drawing_attribute_value_data]
         )
-
-    def _chunks(self, data):
-        iterator = iter(data)
-        while True:
-            chunk = list(islice(iterator, self._chunk_size))
-            if not chunk:
-                break
-            yield chunk
-
-    def _batch_data_generator(self, data):
-        print("starting batch data generator")
-        for chunk in self._chunks(data):
-            batch_X = []
-            batch_y = []
-
-            for name, attribute_value in chunk:
-                drawing_path = os.path.join(self._drawings_dir, name + '_lines.svg')
-                drawing_array = self._svg_to_numpy_array(drawing_path)
-                batch_X.append(drawing_array)
-                batch_y.append(int(attribute_value))
-            
-            batch_X = np.array(batch_X).reshape(len(batch_X), -1)
-            batch_y = np.array(batch_y)
-            yield batch_X, batch_y
-
 
     @abstractmethod
     def train(self):
@@ -116,6 +94,30 @@ class CelebAIncrementalClassifier(CelebADrawingsClassifier):
     def __init__(self, drawings_directory: str, attributes_file: str, attribute_for_classification: str, chunk_size: int = 100):
         super().__init__(drawings_directory, attributes_file, attribute_for_classification, chunk_size)
         self.model = SGDClassifier()
+
+    def _chunks(self, data):
+        iterator = iter(data)
+        while True:
+            chunk = list(islice(iterator, self._chunk_size))
+            if not chunk:
+                break
+            yield chunk
+
+    def _batch_data_generator(self, data):
+        print("starting batch data generator")
+        for chunk in self._chunks(data):
+            batch_X = []
+            batch_y = []
+
+            for name, attribute_value in chunk:
+                drawing_path = os.path.join(self._drawings, name + '_lines.svg')
+                drawing_array = self._svg_to_numpy_array(drawing_path)
+                batch_X.append(drawing_array)
+                batch_y.append(int(attribute_value))
+            
+            batch_X = np.array(batch_X).reshape(len(batch_X), -1)
+            batch_y = np.array(batch_y)
+            yield batch_X, batch_y
 
     def train(self):
         first_batch = True
@@ -148,28 +150,62 @@ class CelebAIncrementalClassifier(CelebADrawingsClassifier):
 
 
 class CelebALSTMClassifier(CelebADrawingsClassifier):
-    def __init__(self, drawings_directory: str, attributes_file: str, attribute_for_classification: str, chunk_size: int = 100):
-        super().__init__(drawings_directory, attributes_file, attribute_for_classification, chunk_size)
+    def __init__(self, drawings_file: str, attributes_file: str, attribute_for_classification: str):
+        super().__init__(drawings_file, attributes_file, attribute_for_classification)
+        self._drawing_length_dict = defaultdict(list)
         self.model = self._build_model()
+        self._generate_drawing_length_dict()
 
     def _build_model(self):
         model = Sequential([
-            LSTM(64, input_shape=(218, 178 * 4), return_sequences=False),
+            LSTM(64, input_shape=(None, 4), return_sequences=False), 
             Dense(1, activation='sigmoid')
         ])
         model.compile(optimizer='Adam', loss='binary_crossentropy', metrics=['accuracy'])
         return model
 
-    def train(self, epochs=1):
+    def _generate_drawing_length_dict(self):
+        """Populates a dictionary with length of drawing (number of points) as keys and the values are the indexes 
+        of the rows (drawings) that have that length."""
+        with open(self._drawings, 'r') as file:
+            for idx, drawing in enumerate(file):
+                points = drawing.strip().split('),(')
+                length = len(points)
+                self._drawing_length_dict[length].append(idx)
+
+    def _batch_data_generator(self, data):
+        """For each of the lengths in the internal dictionary, generate a batch with the drawing of said length."""
+        lengths = list(self._drawing_length_dict.keys())
+
+        with open(self._drawings, 'r') as file:
+            drawings = file.readlines()
+
+        for length in lengths:
+            idxs = self._drawing_length_dict[length]
+            batch_X = []
+            batch_y = []
+            print(f"length {length}")
+
+            for i in idxs:
+                print(f"idx {i}")
+                drawing_raw = drawings[i].strip()
+                drawing = np.array(eval(f"[{drawing_raw}]"))
+                batch_X.append(drawing)
+
+                attribute_value = int(self._drawing_attribute_value_dict[i])
+                batch_y.append(attribute_value)
+            
+            batch_X = np.array(batch_X).reshape(len(batch_X), -1)
+            batch_y = np.array(batch_y)
+
+            yield batch_X, batch_y
+
+    def train(self, epochs=10):
         for epoch in range(epochs):
-            i = 1
+            print(f"epoch {epoch}")
             for batch_X, batch_y in self._batch_data_generator(self.train_data):
-                batch_y = np.array([0 if label == -1 else 1 for label in batch_y])
-                batch_X = batch_X.reshape(batch_X.shape[0], 218, 178 * 4)
-                self.model.fit(batch_X, batch_y, epochs=1, verbose=1, batch_size=self._chunk_size)
-                if i % 100 == 0:
-                    print(f"processed batch number {i}...")
-                i += 1
+                print(f"fit")
+                self.model.fit(batch_X, batch_y) 
 
     def evaluate(self):
         print("evaluating")
@@ -177,10 +213,7 @@ class CelebALSTMClassifier(CelebADrawingsClassifier):
         total_pred_y = []
         i = 0
         for batch_X, batch_y in self._batch_data_generator(self.test_data):
-            batch_y = np.array([0 if label == -1 else 1 for label in batch_y])
-            batch_X = batch_X.reshape(batch_X.shape[0], 218, 178 * 4)
             pred_y = self.model.predict(batch_X)
-            pred_y = np.round(pred_y).astype(int)
             if i % 100 == 0:
                 print(f"already predicted batch {i}")
             i += 1
@@ -188,7 +221,6 @@ class CelebALSTMClassifier(CelebADrawingsClassifier):
             total_pred_y.extend(pred_y)
         
         self.show_results(total_pred_y, total_true_y)
-
 
 
 def check_classes_balance(attributes_file):
@@ -232,11 +264,10 @@ if __name__ == "__main__":
         # print(f"Attribute {balance_info['attribute']}: {balance_info['balance_percentage']:.2f} (class 1: {balance_info['class_1_count']}, class -1: {balance_info['class_minus_1_count']})")
     
     # classifier = CelebAIncrementalClassifier('../CelebADrawings/', '../CelebA/Anno/list_attr_celeba.txt', 'Smiling') 
-    
-    # classifier.train()
-    # classifier.evaluate()
+    # classifier = CelebALSTMClassifier('../CelebADrawings/', '../CelebA/Anno/list_attr_celeba.txt', 'Smiling')
 
-    classifier = CelebALSTMClassifier('../CelebADrawings/', '../CelebA/Anno/list_attr_celeba.txt', 'Smiling')
-    # classifier = CelebALSTMClassifier('../test/', '../test/list_attr_celeba.txt', 'Smiling')
+    # classifier = CelebALSTMClassifier('../test-convert-to-draw/all_drawings.txt', '../test-convert-to-draw/attributes.txt', 'Smiling')
+    classifier = CelebAIncrementalClassifier('../test-convert-to-draw/drawings', '../test-convert-to-draw/attributes.txt', 'Smiling')
+
     classifier.train()
     classifier.evaluate()
