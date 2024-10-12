@@ -159,7 +159,7 @@ class CelebALSTMClassifier(CelebADrawingsClassifier):
 
     def _build_model(self):
         model = Sequential()
-        model.add(LSTM(64, input_shape=(None, 3)))
+        model.add(LSTM(64, input_shape=(None, 4)))
         model.add(Dense(1, activation='sigmoid'))
         model.compile(optimizer='Adam', loss='binary_crossentropy', metrics=['accuracy'])
         return model
@@ -246,8 +246,6 @@ class CelebALSTMClassifier(CelebADrawingsClassifier):
                 i += 1
                 total_true_y.extend(batch_y)
                 total_pred_y.extend(pred_y)
-                print(total_true_y)
-                print(total_pred_y)
             
             self.show_results(total_pred_y, total_true_y)
         else:
@@ -259,8 +257,6 @@ class CelebALSTMClassifier(CelebADrawingsClassifier):
                 i += 1
                 total_true_y.extend(batch_y)
                 total_pred_y.extend(pred_y)
-                print(total_true_y)
-                print(total_pred_y)
             
             self.show_results(total_pred_y, total_true_y)
 
