@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 import chunk
+from multiprocessing.sharedctypes import Value
 import os
 from pkgutil import ImpImporter
 import numpy as np
@@ -11,12 +12,14 @@ from sklearn.metrics import accuracy_score, confusion_matrix, classification_rep
 from itertools import islice
 from sklearn.linear_model import SGDClassifier
 from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import LSTM, Dense
+from tensorflow.keras.layers import LSTM, Dense, Dropout
+from tensorflow.keras.preprocessing.sequence import pad_sequences
+from sklearn.utils import class_weight
 from collections import defaultdict
 
 class CelebADrawingsClassifier(ABC):
     """Abstract class to classify drawings from the images of the CelebA dataset."""
-    def __init__(self, drawings, attributes_file, attribute_for_classification, chunk_size=10000, train_percentage=0.75):
+    def __init__(self, drawings, attributes_file, attribute_for_classification, chunk_size=40000, train_percentage=0.75):
         self._drawings = drawings
         self._attributes_file = attributes_file
         self._chunk_size = chunk_size
@@ -99,7 +102,7 @@ class CelebADrawingsClassifier(ABC):
         
 
 class CelebAIncrementalClassifier(CelebADrawingsClassifier):
-    def __init__(self, drawings_directory: str, attributes_file: str, attribute_for_classification: str, chunk_size: int = 100):
+    def __init__(self, drawings_directory: str, attributes_file: str, attribute_for_classification: str, chunk_size: int = 1000):
         super().__init__(drawings_directory, attributes_file, attribute_for_classification, chunk_size)
         self.model = SGDClassifier()
 
@@ -150,28 +153,48 @@ class CelebAIncrementalClassifier(CelebADrawingsClassifier):
 
 
 class CelebALSTMClassifier(CelebADrawingsClassifier):
-    def __init__(self, drawings_file: str, attributes_file: str, attribute_for_classification: str, padded_data: bool = False):
+    NO_PADDING = "no_padding"
+    PAD_BY_CHUNK = "pad_by_chunk"
+    ALREADY_PADDED = "already_padded"
+
+
+    def __init__(self, drawings_file: str, attributes_file: str, attribute_for_classification: str, padding: str = NO_PADDING):
         super().__init__(drawings_file, attributes_file, attribute_for_classification)
-        self.padded_data = padded_data
-        self._drawing_length_dict = defaultdict(list)
+        self.padding = padding
+        self._drawing_length_dict_train_data = defaultdict(list)
+        self._drawing_length_dict_test_data = defaultdict(list)
         self.model = self._build_model()
         self._generate_drawing_length_dict()
 
     def _build_model(self):
         model = Sequential()
-        model.add(LSTM(64, input_shape=(None, 4)))
+        model.add(LSTM(150, input_shape=(None, 4), return_sequences=True))
+        model.add(Dropout(0.2))
+        model.add(LSTM(150, return_sequences=True))
+        model.add(Dropout(0.2))
+        model.add(LSTM(150))
         model.add(Dense(1, activation='sigmoid'))
         model.compile(optimizer='Adam', loss='binary_crossentropy', metrics=['accuracy'])
         return model
 
     def _generate_drawing_length_dict(self):
-        """Populates a dictionary with length of drawing (number of points) as keys and the values are the indexes 
-        of the rows (drawings) that have that length."""
+        """Populates two dictionaries (one for train data and another for test) with length of drawing (number of 
+        points) as keys and the values are the indexes of the rows (drawings) that have that length."""
         with open(self._drawings, 'r') as file:
-            for idx, drawing in enumerate(file):
+            lines = file.readlines()
+            for name, _ in self.train_data:
+                idx = int(name) - 1
+                drawing = lines[idx]
                 points = drawing.strip().split('),(')
                 length = len(points)
-                self._drawing_length_dict[length].append(idx)
+                self._drawing_length_dict_train_data[length].append(idx)
+
+            for name, _ in self.test_data:
+                idx = int(name) - 1
+                drawing = lines[idx]
+                points = drawing.strip().split('),(')
+                length = len(points)
+                self._drawing_length_dict_test_data[length].append(idx)
 
     def _padded_batch_data_generator(self, data):
         """Generates batches of data using padded data. This means, all drawings have the same number of points."""
@@ -195,49 +218,105 @@ class CelebALSTMClassifier(CelebADrawingsClassifier):
 
             yield batch_X, batch_y
 
-    def _batch_data_generator(self, data):
-        """For each of the lengths in the internal dictionary, generate a batch with the drawing of said length."""
-        lengths = list(self._drawing_length_dict.keys())
+    def _batch_data_generator_padding_chunks(self, data):
+        with open(self._drawings, 'r') as file:
+            drawings = file.readlines()
 
+        for chunk in self._chunks(data):
+            batch_X = []
+            batch_y = []
+
+            for name, attribute_value in chunk:
+                drawing_idx = int(name) - 1
+                drawing_raw = drawings[drawing_idx].strip().strip('()')
+                points = [list(map(int, p.split(','))) for p in drawing_raw.split('),(')]
+                batch_X.append(points)
+                label = 0 if int(attribute_value) == -1 else 1
+                batch_y.append(label)
+
+            batch_X = pad_sequences(batch_X)
+
+            batch_X = np.array(batch_X)
+            batch_y = np.array(batch_y)
+
+            yield batch_X, batch_y 
+
+    def _batch_data_generator(self, is_training: bool = True):
+        """For each of the lengths in the internal dictionary, generate a batch with the drawing of said length."""
+        lengths = list(self._drawing_length_dict_train_data.keys()) if is_training else list(self._drawing_length_dict_test_data.keys())
+        
         with open(self._drawings, 'r') as file:
             drawings = file.readlines()
 
         for length in lengths:
-            idxs = self._drawing_length_dict[length]
+            idxs = self._drawing_length_dict_train_data[length] if is_training else self._drawing_length_dict_test_data[length]
             batch_X = []
             batch_y = []
 
             for i in idxs:
                 drawing_raw = drawings[i].strip().strip('()')
-                points = np.array([list(map(int, p.split(','))) for p in drawing_raw.split('),(')])  # Convert drawing to numpy array
+                points = np.array([list(map(int, p.split(','))) for p in drawing_raw.split('),(')])  
                 batch_X.append(points)
-
-                attribute_value = 0 if int(self._drawing_attribute_value_dict[i]) == -1 else 1
-                batch_y.append(attribute_value)
+                label = 0 if int(self._drawing_attribute_value_dict[i]) == -1 else 1
+                batch_y.append(label)
 
             batch_X = np.array(batch_X)
             batch_y = np.array(batch_y)
 
             yield batch_X, batch_y
 
-    def train(self, epochs=10):
+    def train(self, epochs=5):
         for epoch in range(epochs):
             print(f"epoch {epoch}")
-            if self.padded_data:
-                for batch_X, batch_y in self._padded_batch_data_generator(self.train_data):
-                    print(f"fit")
-                    self.model.fit(batch_X, batch_y)
-            else:
-                for batch_X, batch_y in self._batch_data_generator(self.train_data):
-                    print(f"fit")
+            print(f"padding {self.padding}")
+            if self.padding == self.NO_PADDING:
+                for batch_X, batch_y in self._batch_data_generator():
+                    print("fit")
                     self.model.fit(batch_X, batch_y) 
+
+            elif self.padding == self.PAD_BY_CHUNK:
+                for batch_X, batch_y in self._batch_data_generator_padding_chunks(self.train_data):
+                    print("fit")
+                    class_weights = dict(enumerate(class_weight.compute_class_weight('balanced', classes=np.unique(batch_y), y=batch_y)))
+                    print(class_weights)
+                    self.model.fit(batch_X, batch_y, class_weight=class_weights)
+            
+            elif self.padding == self.ALREADY_PADDED:
+                for batch_X, batch_y in self._padded_batch_data_generator(self.train_data):
+                    print("fit")
+                    self.model.fit(batch_X, batch_y)
+
+            else: 
+                raise ValueError("padding value not valid.")
 
     def evaluate(self):
         print("evaluating")
         total_true_y = []
         total_pred_y = []
         i = 0
-        if self.padded_data:
+        if self.padding == self.NO_PADDING:
+            for batch_X, batch_y in self._batch_data_generator(is_training=False):
+                pred_y = self.model.predict(batch_X)
+                pred_y = np.round(pred_y).astype(int).flatten()
+                if i % 100 == 0:
+                    print(f"already predicted batch {i}")
+                i += 1
+                total_true_y.extend(batch_y)
+                total_pred_y.extend(pred_y)
+            self.show_results(total_pred_y, total_true_y)
+
+        elif self.padding == self.PAD_BY_CHUNK:
+            for batch_X, batch_y in self._batch_data_generator_padding_chunks(self.test_data):
+                pred_y = self.model.predict(batch_X)
+                pred_y = np.round(pred_y).astype(int).flatten()
+                if i % 100 == 0:
+                    print(f"already predicted batch {i}")
+                i += 1
+                total_true_y.extend(batch_y)
+                total_pred_y.extend(pred_y)
+            self.show_results(total_pred_y, total_true_y)
+        
+        elif self.padding == self.ALREADY_PADDED:
             for batch_X, batch_y in self._padded_batch_data_generator(self.test_data):
                 pred_y = self.model.predict(batch_X)
                 pred_y = np.round(pred_y).astype(int).flatten()
@@ -246,19 +325,9 @@ class CelebALSTMClassifier(CelebADrawingsClassifier):
                 i += 1
                 total_true_y.extend(batch_y)
                 total_pred_y.extend(pred_y)
-            
             self.show_results(total_pred_y, total_true_y)
         else:
-            for batch_X, batch_y in self._batch_data_generator(self.test_data):
-                pred_y = self.model.predict(batch_X)
-                pred_y = np.round(pred_y).astype(int).flatten()
-                if i % 100 == 0:
-                    print(f"already predicted batch {i}")
-                i += 1
-                total_true_y.extend(batch_y)
-                total_pred_y.extend(pred_y)
-            
-            self.show_results(total_pred_y, total_true_y)
+            raise ValueError("padding value not valid.")
 
 
 def check_classes_balance(attributes_file):
@@ -301,14 +370,14 @@ if __name__ == "__main__":
     # for balance_info in classes_balances:
         # print(f"Attribute {balance_info['attribute']}: {balance_info['balance_percentage']:.2f} (class 1: {balance_info['class_1_count']}, class -1: {balance_info['class_minus_1_count']})")
     
-    # classifier = CelebAIncrementalClassifier('../CelebADrawings/', '../CelebA/Anno/list_attr_celeba.txt', 'Smiling') 
+    # classifier = CelebAIncrementalClassifier('../CelebADrawings/all_drawings.txt', '../CelebA/Anno/list_attr_celeba.txt', 'Smiling') 
     # classifier = CelebALSTMClassifier('../CelebADrawings/all_drawings_padded.txt', '../CelebA/Anno/list_attr_celeba.txt', 'Smiling', padded_data=True)
-    classifier = CelebALSTMClassifier('../CelebADrawings/all_drawings.txt', '../CelebA/Anno/list_attr_celeba.txt', 'Smiling')
+    classifier = CelebALSTMClassifier('../CelebADrawings/all_drawings.txt', '../CelebA/Anno/list_attr_celeba.txt', 'Wavy_Hair', padding="pad_by_chunk")
     # classifier = CelebALSTMClassifier('../CelebADrawings/all_drawings.txt', '../CelebA/Anno/list_attr_celeba.txt', 'Eyeglasses')
 
     # testing classifiers with small testing data sets
     # classifier = CelebALSTMClassifier('../test-convert-to-draw/all_drawings_padded.txt', '../test-convert-to-draw/attributes.txt', 'Smiling')
-    # classifier = CelebALSTMClassifier('../test-convert-to-draw/all_drawings_pos.txt', '../test-convert-to-draw/attributes.txt', 'Smiling')
+    # classifier = CelebALSTMClassifier('../test-convert-to-draw/all_drawings.txt', '../test-convert-to-draw/attributes.txt', 'Wavy_Hair', padding="pad_by_chunk")
     # classifier = CelebAIncrementalClassifier('../test-convert-to-draw/drawings', '../test-convert-to-draw/attributes.txt', 'Smiling')
 
     classifier.train()
